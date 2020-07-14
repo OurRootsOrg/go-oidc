@@ -188,9 +188,17 @@ type UserInfo struct {
 	Subject       string `json:"sub"`
 	Profile       string `json:"profile"`
 	Email         string `json:"email"`
-	EmailVerified StringAsBool   `json:"email_verified"`
+	EmailVerified bool   `json:"email_verified"`
 
 	claims []byte
+}
+
+// UserInfoRaw allows us to decode both compliant and non-compliant Cognito userInfo
+type UserInfoRaw struct {
+	Subject       string       `json:"sub"`
+	Profile       string       `json:"profile"`
+	Email         string       `json:"email"`
+	EmailVerified StringAsBool `json:"email_verified"`
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
@@ -239,12 +247,17 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		body = payload
 	}
 
-	var userInfo UserInfo
-	if err := json.Unmarshal(body, &userInfo); err != nil {
+	var userInfoRaw UserInfoRaw
+	if err := json.Unmarshal(body, &userInfoRaw); err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
 	}
-	userInfo.claims = body
-	return &userInfo, nil
+	return &UserInfo{
+		Subject:       userInfoRaw.Subject,
+		Profile:       userInfoRaw.Profile,
+		Email:         userInfoRaw.Email,
+		EmailVerified: bool(userInfoRaw.EmailVerified),
+		claims:        body,
+	}, nil
 }
 
 // IDToken is an OpenID Connect extension that provides a predictable representation
@@ -367,22 +380,24 @@ type claimSource struct {
 	AccessToken string `json:"access_token"`
 }
 
+// Cognito reports email_verified as a string in userInfo, so try decoding as a bool or a string
 type StringAsBool bool
 
 func (sb *StringAsBool) UnmarshalJSON(b []byte) error {
 	var result bool
 	err := json.Unmarshal(b, &result)
+	if err == nil {
+		*sb = StringAsBool(result)
+		return nil
+	}
+	var s string
+	err = json.Unmarshal(b, &s)
 	if err != nil {
-		// cognito reports email_verified as a string, so try that
-		var s string
-		err = json.Unmarshal(b, &s)
-		if err != nil {
-			return err
-		}
-		result, err = strconv.ParseBool(s)
-		if err != nil {
-			return err
-		}
+		return err
+	}
+	result, err = strconv.ParseBool(s)
+	if err != nil {
+		return err
 	}
 	*sb = StringAsBool(result)
 	return nil
