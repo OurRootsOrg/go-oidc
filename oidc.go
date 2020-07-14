@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"mime"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -187,7 +188,7 @@ type UserInfo struct {
 	Subject       string `json:"sub"`
 	Profile       string `json:"profile"`
 	Email         string `json:"email"`
-	EmailVerified bool   `json:"email_verified"`
+	EmailVerified StringAsBool   `json:"email_verified"`
 
 	claims []byte
 }
@@ -356,6 +357,7 @@ type idToken struct {
 	NotBefore    *jsonTime              `json:"nbf"`
 	Nonce        string                 `json:"nonce"`
 	AtHash       string                 `json:"at_hash"`
+	ClientID     string                 `json:"client_id,omitempty"` // Cognito sets client_id instead of aud
 	ClaimNames   map[string]string      `json:"_claim_names"`
 	ClaimSources map[string]claimSource `json:"_claim_sources"`
 }
@@ -363,6 +365,27 @@ type idToken struct {
 type claimSource struct {
 	Endpoint    string `json:"endpoint"`
 	AccessToken string `json:"access_token"`
+}
+
+type StringAsBool bool
+
+func (sb *StringAsBool) UnmarshalJSON(b []byte) error {
+	var result bool
+	err := json.Unmarshal(b, &result)
+	if err != nil {
+		// cognito reports email_verified as a string, so try that
+		var s string
+		err = json.Unmarshal(b, &s)
+		if err != nil {
+			return err
+		}
+		result, err = strconv.ParseBool(s)
+		if err != nil {
+			return err
+		}
+	}
+	*sb = StringAsBool(result)
+	return nil
 }
 
 type audience []string
