@@ -193,12 +193,12 @@ type UserInfo struct {
 	claims []byte
 }
 
-// UserInfoRaw allows us to decode both compliant and non-compliant Cognito userInfo
-type UserInfoRaw struct {
+// userInfoRaw allows us to decode both compliant and non-compliant Cognito userInfo
+type userInfoRaw struct {
 	Subject       string       `json:"sub"`
 	Profile       string       `json:"profile"`
 	Email         string       `json:"email"`
-	EmailVerified StringAsBool `json:"email_verified"`
+	EmailVerified stringAsBool `json:"email_verified"`
 }
 
 // Claims unmarshals the raw JSON object claims into the provided object.
@@ -247,15 +247,15 @@ func (p *Provider) UserInfo(ctx context.Context, tokenSource oauth2.TokenSource)
 		body = payload
 	}
 
-	var userInfoRaw UserInfoRaw
-	if err := json.Unmarshal(body, &userInfoRaw); err != nil {
+	var userInfo userInfoRaw
+	if err := json.Unmarshal(body, &userInfo); err != nil {
 		return nil, fmt.Errorf("oidc: failed to decode userinfo: %v", err)
 	}
 	return &UserInfo{
-		Subject:       userInfoRaw.Subject,
-		Profile:       userInfoRaw.Profile,
-		Email:         userInfoRaw.Email,
-		EmailVerified: bool(userInfoRaw.EmailVerified),
+		Subject:       userInfo.Subject,
+		Profile:       userInfo.Profile,
+		Email:         userInfo.Email,
+		EmailVerified: bool(userInfo.EmailVerified),
 		claims:        body,
 	}, nil
 }
@@ -381,13 +381,13 @@ type claimSource struct {
 }
 
 // Cognito reports email_verified as a string in userInfo, so try decoding as a bool or a string
-type StringAsBool bool
+type stringAsBool bool
 
-func (sb *StringAsBool) UnmarshalJSON(b []byte) error {
+func (sb *stringAsBool) UnmarshalJSON(b []byte) error {
 	var result bool
 	err := json.Unmarshal(b, &result)
 	if err == nil {
-		*sb = StringAsBool(result)
+		*sb = stringAsBool(result)
 		return nil
 	}
 	var s string
@@ -399,7 +399,7 @@ func (sb *StringAsBool) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	*sb = StringAsBool(result)
+	*sb = stringAsBool(result)
 	return nil
 }
 

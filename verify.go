@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -185,6 +186,8 @@ func parseClaim(raw []byte, name string, v interface{}) error {
 	return json.Unmarshal([]byte(val), v)
 }
 
+var cognitoIssuer = regexp.MustCompile(`^https://cognito-idp\.[-a-z0-9]+\.amazonaws\.com/.+$`)
+
 // Verify parses a raw ID Token, verifies it's been signed by the provider, preforms
 // any additional checks depending on the Config, and returns the payload.
 //
@@ -238,7 +241,7 @@ func (v *IDTokenVerifier) Verify(ctx context.Context, rawIDToken string) (*IDTok
 
 	// Cognito sets client_id instead of aud
 	var audience []string = token.Audience
-	if len(audience) == 0 && token.ClientID != "" {
+	if len(audience) == 0 && cognitoIssuer.MatchString(token.Issuer) && token.ClientID != "" {
 		audience = []string{token.ClientID}
 	}
 
